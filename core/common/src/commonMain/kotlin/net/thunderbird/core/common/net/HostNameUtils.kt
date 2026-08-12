@@ -165,7 +165,9 @@ object HostNameUtils {
     }
 
     /**
-     * Check if `hostName` is a valid hostname.
+     * Check if `hostName` is a valid hostname, including IDNA if applicable.
+     * Returns the human-readable form if `hostName` is an IDN such as `grå.org`,
+     * not the xn-- form.
      *
      * @returns The host name if it is valid. Returns `null` if it's not.
      */
@@ -204,9 +206,20 @@ object HostNameUtils {
 
          Since a complete domain name ends with the root label, this leads to
          a printed form which ends in a dot.
+
+         Internationalized domain names are validated through their
+         a-label form, but email allows the more human-readable UTF8 form,
+         so that's what is returned. The DNS length limit likewise applies
+         to the A-label form.
          */
 
-        return hostName.takeIf { hostName.length <= 255 && HOST_PATTERN.matches(hostName) }
+        val asciiHostName = if (hostName.all { it.code < ASCII_LIMIT }) {
+            hostName
+        } else {
+            hostNameToAscii(hostName) ?: return null
+        }
+
+        return hostName.takeIf { asciiHostName.length <= 255 && HOST_PATTERN.matches(asciiHostName) }
     }
 
     /**
@@ -217,9 +230,19 @@ object HostNameUtils {
         return hostName.trim()
     }
 
+    private const val ASCII_LIMIT = 128
+
     private const val LDH_LABEL = "([a-z0-9]|[a-z0-9][a-z0-9\\-]{0,61}[a-z0-9])"
     private val HOST_PATTERN = """($LDH_LABEL\.)*$LDH_LABEL\.?""".toRegex(RegexOption.IGNORE_CASE)
 
     private val IPV4_COMPONENT_PATTERN = "(0|([1-9][0-9]{0,2}))".toRegex()
     private val IPV6_COMPONENT_PATTERN = "[0-9a-f]{1,4}".toRegex()
 }
+
+/**
+ * Converts a possible IDN name to its ASCII (xn--...)  form, or returns
+ * `null` if `hostName` is not a valid IDN. The result is only used to check
+ * validity; callers that display or store the host name generally use the
+ * UTF8 string.
+ */
+internal expect fun hostNameToAscii(hostName: String): String?

@@ -63,16 +63,30 @@ class UserInputEmailAddressParserTest {
 
     @Test
     fun `address with non-ASCII character in local part`() {
-        assertFailure {
-            parser.parse("müller@domain.example")
-        }.isInstanceOf<NonAsciiEmailAddressException>()
+        val addresses = parser.parse("müller@domain.example")
+
+        assertThat(addresses).containsExactly(Address("müller@domain.example"))
     }
 
     @Test
     fun `address with non-ASCII character in domain part`() {
+        val addresses = parser.parse("user@dömain.example")
+
+        assertThat(addresses).containsExactly(Address("user@dömain.example"))
+    }
+
+    @Test
+    fun `address with non-ASCII characters in both local and domain part`() {
+        val addresses = parser.parse("grå@grå.org")
+
+        assertThat(addresses).containsExactly(Address("grå@grå.org"))
+    }
+
+    @Test
+    fun `address with a Unicode domain that is not a valid IDN`() {
         assertFailure {
-            parser.parse("user@dömain.example")
-        }.isInstanceOf<NonAsciiEmailAddressException>()
+            parser.parse("example@🤣.com")
+        }.isInstanceOf<InvalidUnicodeDomainException>()
     }
 
     @Test

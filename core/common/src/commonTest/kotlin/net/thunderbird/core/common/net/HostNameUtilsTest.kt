@@ -46,6 +46,37 @@ class HostNameUtilsTest {
     }
 
     @Test
+    fun `valid internationalized host names`() {
+        assertThat("grå.org").isLegalHostName()
+        assertThat("münchen.de").isLegalHostName()
+        assertThat("orléans.fr").isLegalHostName()
+        assertThat("例子.中国").isLegalHostName()
+        assertThat("慕田峪长城.网址").isLegalHostName()
+        assertThat("उदाहरण.भारत").isLegalHostName()
+        // A single all-Unicode label, no dot, is still a legal host name.
+        assertThat("grå").isLegalHostName()
+    }
+
+    @Test
+    fun `internationalized host names keep their Unicode form`() {
+        // The Unicode string is returned unchanged; punycode belongs inside the DNS, not in the value we hand back.
+        assertThat(HostNameUtils.isLegalHostName("grå.org")).isEqualTo("grå.org")
+        assertThat(HostNameUtils.isLegalHostNameOrIP("grå.org")).isEqualTo("grå.org")
+    }
+
+    @Test
+    fun `invalid internationalized host names`() {
+        // An empty label between the Unicode label and the TLD.
+        assertThat("grå..org").isNotLegalHostName()
+        // A leading dot.
+        assertThat(".grå.org").isNotLegalHostName()
+        // An emoji is unassigned in Unicode 3.2, the base of the IDNA2003 mapping java.net.IDN implements, so
+        // the conversion to punycode rejects it. Note that this does not reject every symbol: characters that
+        // already existed in Unicode 3.2, such as ☺ (U+263A), do convert and are accepted.
+        assertThat("grå🤣.org").isNotLegalHostName()
+    }
+
+    @Test
     fun `valid IPv4 addresses`() {
         assertThat("1.2.3.4").isLegalIPv4Address()
         assertThat("123.245.111.222").isLegalIPv4Address()

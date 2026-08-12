@@ -2,7 +2,6 @@ package com.fsck.k9.view
 
 import com.fsck.k9.mail.Address
 import net.thunderbird.core.common.net.HostNameUtils
-import org.apache.james.mime4j.util.CharsetUtil
 
 /**
  * Used to parse name & email address pairs entered by the user.
@@ -12,13 +11,15 @@ import org.apache.james.mime4j.util.CharsetUtil
  */
 internal class UserInputEmailAddressParser {
 
-    @Throws(NonAsciiEmailAddressException::class)
+    @Throws(InvalidUnicodeDomainException::class)
     fun parse(input: String): List<Address> {
         return Address.parseUnencoded(input)
             .mapNotNull { address ->
                 when {
                     address.isIncomplete() -> null
-                    address.isNonAsciiAddress() -> throw NonAsciiEmailAddressException(address.address)
+                    // A Unicode string that isn't a valid IDN (e.g. ≠.net)
+                    // earns a specific complaint instead of being silently dropped.
+                    address.hasInvalidUnicodeDomain() -> throw InvalidUnicodeDomainException(address.address)
                     address.isInvalidDomainPart() -> null
                     else -> Address.parse(address.toEncodedString()).firstOrNull()
                 }
@@ -27,9 +28,15 @@ internal class UserInputEmailAddressParser {
 
     private fun Address.isIncomplete() = hostname.isNullOrBlank()
 
-    private fun Address.isNonAsciiAddress() = !CharsetUtil.isASCII(address)
-
     private fun Address.isInvalidDomainPart() = HostNameUtils.isLegalHostNameOrIP(hostname) == null
+
+    private fun Address.hasInvalidUnicodeDomain() = hasNonAsciiDomain() && isInvalidDomainPart()
+
+    private fun Address.hasNonAsciiDomain() = hostname?.any { it.code >= ASCII_LIMIT } == true
+
+    private companion object {
+        const val ASCII_LIMIT = 128
+    }
 }
 
-internal class NonAsciiEmailAddressException(message: String) : Exception(message)
+internal class InvalidUnicodeDomainException(message: String) : Exception(message)

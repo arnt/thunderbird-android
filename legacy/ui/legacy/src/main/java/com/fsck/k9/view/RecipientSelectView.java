@@ -205,7 +205,7 @@ public class RecipientSelectView extends TokenCompleteTextView<Recipient> implem
                 recipients.add(new Recipient(a));
             }
             return recipients;
-        } catch (NonAsciiEmailAddressException e) {
+        } catch (InvalidUnicodeDomainException e) {
             setError(getContext().getString(R.string.recipient_error_non_ascii));
             return List.of();
         }
